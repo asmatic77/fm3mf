@@ -1,4 +1,4 @@
-# three-mem-fast (I will most definitely change the name, I don't like it :P)
+# fm3mf 
 
 [![CI](https://github.com/asmatic77/three-mem-fast/actions/workflows/ci.yml/badge.svg)](https://github.com/asmatic77/three-mem-fast/actions/workflows/ci.yml)
 
