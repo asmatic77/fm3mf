@@ -14,14 +14,13 @@ use crate::MeshSink;
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct Parser3mf {
+pub struct Streaming3mfParser {
     archive: zip::ZipArchive<BufReader<File>>,
     root_part_path: String,
     geometry_stats: GeometryStatistics, // TODO maybe a parser does not need to know this
-    units: String,
 }
 
-impl Parser3mf {
+impl Streaming3mfParser {
     pub fn parse_root_part(&mut self, sink: &mut impl MeshSink) -> Result<(), Error> {
         let root_file_path = self
             .root_part_path
@@ -53,9 +52,9 @@ impl Parser3mf {
             match xml_reader.read_event_into(&mut buf) {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                     match e.name().as_ref() {
-                        MODEL_TAG => (),
+                        MODEL_TAG => Streaming3mfParser::parse_units(&e, sink)?,
                         RESOURCES_TAG => (),
-                        OBJECT_TAG => Parser3mf::parse_object(&e, sink, &mut stats)?,
+                        OBJECT_TAG => Streaming3mfParser::parse_object(&e, sink, &mut stats)?,
                         MESH_TAG => (),
                         VERTICES_TAG => (),
                         VERTEX_TAG => {
@@ -92,6 +91,15 @@ impl Parser3mf {
         }
         drop(xml_reader);
         self.geometry_stats = stats;
+        Ok(())
+    }
+
+    fn parse_units(model_element: &BytesStart, sink: &mut impl MeshSink) -> Result<(), Error> {
+        sink.unit(
+            find_attr_value(model_element, b"unit")
+                .as_deref()
+                .and_then(|bytes| std::str::from_utf8(bytes).ok()),
+        )?;
         Ok(())
     }
 
@@ -262,7 +270,7 @@ fn find_attr_value<'a>(e: &'a BytesStart, key: &[u8]) -> Option<Cow<'a, [u8]>> {
         .map(|attr| attr.value)
 }
 
-pub fn open(path: &Path) -> Result<Parser3mf, Error> {
+pub fn open(path: &Path) -> Result<Streaming3mfParser, Error> {
     const RELS_ENTRY: &str = "_rels/.rels";
     const RELATIONSHIP_TAG: &[u8] = b"Relationship";
     const TYPE_ATTR: &[u8] = b"Type";
@@ -309,11 +317,10 @@ pub fn open(path: &Path) -> Result<Parser3mf, Error> {
     }
     validate_part_type(&mut zip_archive, &target_path)?;
 
-    Ok(Parser3mf {
+    Ok(Streaming3mfParser {
         archive: zip_archive,
         root_part_path: target_path,
         geometry_stats: GeometryStatistics::default(),
-        units: String::default(),
     })
 }
 
@@ -321,7 +328,7 @@ pub fn open(path: &Path) -> Result<Parser3mf, Error> {
 mod tests {
 
     use super::*;
-    use crate::types::{ObjectGeometry, Scene3mfBuilder};
+    use crate::types::{ObjectGeometry, Scene3mfBuilder, Units};
 
     #[test]
     fn open_finds_root_part_relationship() {
@@ -471,5 +478,24 @@ mod tests {
             .with_attributes([("transform", "1 0 0 0 1 0 0 0 1 0 0 0")]);
         let result = find_component(&c, &mut builder);
         assert!(matches!(result, Err(Error::MissingAttribute(_, _))));
+    }
+
+    #[test]
+    fn parses_explicit_unit() {
+        // <model unit="micron"> must be read as Micron, not the default.
+        // A non-default unit distinguishes "read from the file" from "defaulted".
+        let e = quick_xml::events::BytesStart::new("model").with_attributes([("unit", "micron")]);
+        let mut builder = Scene3mfBuilder::default();
+        Streaming3mfParser::parse_units(&e, &mut builder).unwrap();
+        assert!(matches!(builder.units, Units::Micron));
+    }
+
+    #[test]
+    fn defaults_to_millimeter_when_unit_absent() {
+        // A <model> with no unit attribute must default to Millimeter.
+        let e = quick_xml::events::BytesStart::new("model");
+        let mut builder = Scene3mfBuilder::default();
+        Streaming3mfParser::parse_units(&e, &mut builder).unwrap();
+        assert!(matches!(builder.units, Units::Millimeter));
     }
 }

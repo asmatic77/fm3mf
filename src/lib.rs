@@ -6,10 +6,10 @@ use crate::error::Error::{self, NoOpenObject};
 use crate::types::{Component, TmpObject};
 use std::result::Result;
 
-pub use crate::parser::{Parser3mf, open};
+pub use crate::parser::{Streaming3mfParser, open};
 pub use crate::types::{
     GeometryStatistics, Item, Mesh, Object, ObjectGeometry, Scene3mf, Scene3mfBuilder, Transform,
-    Triangle,
+    Triangle, Units,
 };
 
 pub trait MeshSink {
@@ -24,6 +24,7 @@ pub trait MeshSink {
         transform: Option<[f32; 12]>,
         part_number: Option<String>,
     ) -> Result<(), Error>;
+    fn unit(&mut self, unit: Option<&str>) -> Result<(), Error>;
 }
 
 impl MeshSink for Scene3mfBuilder {
@@ -62,6 +63,7 @@ impl MeshSink for Scene3mfBuilder {
             id: obj.id,
             name: obj.name,
             geometry,
+            otype: types::ObjectType::Model, // TODO: properly parse
         };
         self.objects.insert(new_obj.id, new_obj);
         // TODO: evaluate call to shrink_to_fit in the triangles and vertices
@@ -103,6 +105,27 @@ impl MeshSink for Scene3mfBuilder {
         obj.components.push(component);
         Ok(())
     }
+
+    fn unit(&mut self, unit: Option<&str>) -> Result<(), Error> {
+        self.units = match unit {
+            Some(unit) => match unit {
+                "micron" => Units::Micron,
+                "millimeter" => Units::Millimeter,
+                "centimeter" => Units::Centimeter,
+                "meter" => Units::Meter,
+                "inch" => Units::Inch,
+                "foot" => Units::Foot,
+                _ => {
+                    return Err(Error::UnexpectedAttribute(
+                        unit.to_string(),
+                        "object".to_string(),
+                    ));
+                }
+            },
+            None => Units::Millimeter,
+        };
+        Ok(())
+    }
 }
 
 impl Scene3mfBuilder {
@@ -110,6 +133,7 @@ impl Scene3mfBuilder {
         Scene3mf {
             objects: self.objects,
             build_items: self.build_items,
+            units: self.units,
         }
     }
 }

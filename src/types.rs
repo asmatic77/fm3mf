@@ -35,10 +35,16 @@ pub enum ObjectGeometry {
     Components(Vec<Component>),
 }
 
+pub enum ObjectType {
+    Model,
+    Support,
+}
+
 pub struct Object {
     pub id: u32,
     pub name: String,
     pub geometry: ObjectGeometry,
+    pub otype: ObjectType,
 }
 
 pub struct Item {
@@ -47,7 +53,19 @@ pub struct Item {
     pub partname: Option<String>,
 }
 
+#[derive(Default)]
+pub enum Units {
+    Micron,
+    #[default]
+    Millimeter,
+    Centimeter,
+    Meter,
+    Inch,
+    Foot,
+}
+
 pub struct Scene3mf {
+    pub units: Units,
     pub objects: HashMap<u32, Object>,
     pub build_items: Vec<Item>,
 }
@@ -65,4 +83,5 @@ pub struct Scene3mfBuilder {
     pub objects: HashMap<u32, Object>,
     pub build_items: Vec<Item>,
     pub current: Option<TmpObject>,
+    pub units: Units,
 }

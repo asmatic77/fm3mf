@@ -48,4 +48,7 @@ pub enum Error {
 
     #[error("Unexpected 3mf tag {0}")]
     UnexpectedTag(String),
+
+    #[error("Unexpected attribute {0} for element {1}")]
+    UnexpectedAttribute(String, String),
 }
