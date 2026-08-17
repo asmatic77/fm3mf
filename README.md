@@ -7,11 +7,11 @@
 Geared to be able to read very large 3MFs withouth eating unnecesary memory. The 3MF is readed using streaming parsing, to reduce memory footprint.
 Other than that, the parser uses reasonable optimizations to read the file as fast as possible.
 
-I don't aim (at least yet) to produce a full featured 3mf reader/writer.
+I don't aim (at least yet) to produce a full featured 3mf reader/writer, but this is the current state of the lib capabilities
 
 | Spec | Read | Write |
 |---|:---:|:---:|
-| Core | Almost all | None |
+| Core | Geometry complete, missing many metadata | None |
 | Production | None | None |
 
 ## On the use of AI for this repo
